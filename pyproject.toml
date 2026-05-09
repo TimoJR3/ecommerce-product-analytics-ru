@@ -1,0 +1,9 @@
+[project]
+name = "ecommerce-product-analytics"
+version = "0.1.0"
+description = "Product funnel and retention analytics for e-commerce event data"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
