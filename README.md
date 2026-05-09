@@ -69,10 +69,38 @@ pip install -r requirements.txt
 ```
 
 3. Положить сырые CSV-файлы в `data/raw/`.
-4. Запустить проверки:
+4. Подготовить очищенный слой данных:
+
+```powershell
+python scripts/run_etl.py
+```
+
+5. Запустить проверки:
 
 ```powershell
 python -m pytest
+```
+
+## Подготовка данных
+
+Для ETL нужны CSV-файлы из Kaggle dataset `eCommerce Events History in Cosmetics Shop`. Положите в `data/raw/` месячные файлы событий, например:
+
+- `2019-Oct.csv`
+- `2019-Nov.csv`
+- `2019-Dec.csv`
+- `2020-Jan.csv`
+- `2020-Feb.csv`
+
+ETL читает все `.csv` из `data/raw/`, объединяет события, приводит `event_time` к datetime, приводит `price` к float, удаляет полные дубли, исключает строки с отрицательной ценой и сохраняет результат:
+
+```text
+data/processed/events_clean.parquet
+```
+
+Запуск:
+
+```powershell
+python scripts/run_etl.py
 ```
 
 ## 8. Что будет в dashboard
