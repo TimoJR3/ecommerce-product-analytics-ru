@@ -75,7 +75,13 @@ pip install -r requirements.txt
 python scripts/run_etl.py
 ```
 
-5. Запустить проверки:
+5. Построить SQL-витрины:
+
+```powershell
+python scripts/build_marts.py
+```
+
+6. Запустить проверки:
 
 ```powershell
 python -m pytest
@@ -102,6 +108,32 @@ data/processed/events_clean.parquet
 ```powershell
 python scripts/run_etl.py
 ```
+
+## SQL-витрины
+
+SQL-слой строится в DuckDB на основе файла `data/processed/events_clean.parquet`.
+
+Запуск:
+
+```powershell
+python scripts/build_marts.py
+```
+
+Runner создает базу:
+
+```text
+data/marts/ecommerce.duckdb
+```
+
+И экспортирует витрины в `data/marts/` в форматах parquet и CSV.
+
+Схема витрин:
+
+- `fct_events` — очищенные события с датой события и исходными продуктовыми полями.
+- `fct_sessions` — пользовательские сессии с количеством событий, просмотров, добавлений в корзину, покупок, выручкой, длительностью и числом уникальных товаров и категорий.
+- `mart_funnel_daily` — дневная воронка по категории и бренду: просмотры, корзины, покупки, конверсии и выручка.
+- `mart_retention` — cohort retention по месяцу первой покупки.
+- `mart_product_conversion` — конверсия и выручка по товарам.
 
 ## 8. Что будет в dashboard
 
