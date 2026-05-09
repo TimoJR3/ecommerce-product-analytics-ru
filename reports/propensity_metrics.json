@@ -1,0 +1,14 @@
+{
+  "baseline_logistic_regression": {
+    "roc_auc": 0.9774415005360202,
+    "pr_auc": 0.5381412277697344,
+    "precision_at_top_10_percent": 0.30938660378813754,
+    "purchase_capture_rate_at_top_10_percent": 0.9866127898805341
+  },
+  "hist_gradient_boosting": {
+    "roc_auc": 0.9908146277153616,
+    "pr_auc": 0.7553715236957289,
+    "precision_at_top_10_percent": 0.3114139956146633,
+    "purchase_capture_rate_at_top_10_percent": 0.9930780042164441
+  }
+}
