@@ -42,6 +42,8 @@
 ```text
 .
 ├── assets/
+├── bi/
+│   └── datalens/
 ├── data/
 │   ├── marts/
 │   ├── processed/
@@ -63,6 +65,7 @@
 4. `data/marts/*.parquet` и `data/marts/*.csv` — экспортированные аналитические витрины.
 5. `reports/` — спецификация dashboard, бизнес-резюме и метрики модели.
 6. `notebooks/` — аналитические ноутбуки.
+7. `bi/datalens/` — инструкция для ручной сборки dashboard в Yandex DataLens.
 
 ## SQL-витрины
 
@@ -132,12 +135,44 @@ python scripts/train_propensity_model.py
 reports/dashboard_spec.md
 ```
 
+Инструкция для Yandex DataLens находится в:
+
+```text
+bi/datalens/datalens_setup_guide.md
+```
+
 Dashboard состоит из двух страниц:
 
 - управленческий обзор: KPI cards, воронка, breakdown по категориям и брендам, alert block по максимальному drop-off;
 - аналитический обзор: cohort heatmap, retention curve, scatter session depth vs conversion, таблица категорий с высоким трафиком и слабой конверсией, децильный график модели.
 
 Скриншоты dashboard нужно положить в `assets/`:
+
+- `dashboard_page_1_overview.png`
+- `dashboard_page_2_analytics.png`
+- `funnel_chart.png`
+- `cohort_heatmap.png`
+- `propensity_decile_chart.png`
+
+## BI / Yandex DataLens
+
+Проект не создает dashboard в Yandex DataLens автоматически. Для ручной сборки подготовлен отдельный BI-слой: CSV-экспорты и инструкция по настройке datasets, calculated fields, charts, filters и dashboard-страниц.
+
+Экспорт CSV для Yandex DataLens:
+
+```powershell
+python scripts/export_for_datalens.py
+```
+
+Файлы для загрузки в Yandex DataLens:
+
+- `data/marts/datalens_funnel_daily.csv`
+- `data/marts/datalens_retention.csv`
+- `data/marts/datalens_product_conversion.csv`
+- `data/marts/datalens_sessions_summary.csv`
+- `data/marts/datalens_propensity_scores.csv`, если модель вероятности покупки уже обучена
+
+После ручной сборки dashboard нужно положить screenshots в `assets/`:
 
 - `dashboard_page_1_overview.png`
 - `dashboard_page_2_analytics.png`
@@ -173,14 +208,20 @@ python scripts/build_marts.py
 python scripts/train_propensity_model.py
 ```
 
-7. Открыть аналитические ноутбуки:
+7. Подготовить CSV для Yandex DataLens:
+
+```powershell
+python scripts/export_for_datalens.py
+```
+
+8. Открыть аналитические ноутбуки:
 
 ```powershell
 jupyter notebook notebooks/01_product_analysis.ipynb
 jupyter notebook notebooks/02_propensity_model.ipynb
 ```
 
-8. Запустить тесты:
+9. Запустить тесты:
 
 ```powershell
 python -m pytest
