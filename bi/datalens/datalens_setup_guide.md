@@ -19,7 +19,7 @@ python scripts/export_for_datalens.py
 - `datalens_retention.csv`
 - `datalens_product_conversion.csv`
 - `datalens_sessions_summary.csv`
-- `datalens_propensity_scores.csv`, если уже обучена модель вероятности покупки
+- `datalens_propensity_deciles.csv`, если уже обучена модель вероятности покупки
 
 CSV сохраняются в UTF-8.
 
@@ -34,63 +34,63 @@ CSV сохраняются в UTF-8.
    - категории, бренды и дециль скоринга должны быть строками.
 5. Для каждого CSV создайте отдельный dataset.
 
-## 3. Datasets
+## 3. Датасеты
 
-### Dataset `datalens_funnel_daily`
+### Датасет `datalens_funnel_daily`
 
 Источник: `data/marts/datalens_funnel_daily.csv`
 
-Dimensions:
+Измерения:
 
 - `event_date`
 - `category_code`
 - `brand`
 
-Measures:
+Показатели:
 
 - `views_cnt`
 - `carts_cnt`
 - `purchases_cnt`
 - `revenue`
 
-Calculated fields:
+Вычисляемые поля:
 
 - `Конверсия просмотра в корзину` = `SUM([carts_cnt]) / SUM([views_cnt])`
 - `Конверсия корзины в покупку` = `SUM([purchases_cnt]) / SUM([carts_cnt])`
 - `Конверсия просмотра в покупку` = `SUM([purchases_cnt]) / SUM([views_cnt])`
 - `Drop-off корзины` = `1 - SUM([purchases_cnt]) / SUM([carts_cnt])`
 
-### Dataset `datalens_retention`
+### Датасет `datalens_retention`
 
 Источник: `data/marts/datalens_retention.csv`
 
-Dimensions:
+Измерения:
 
 - `cohort_month`
 - `order_month`
 - `months_since_first_purchase`
 
-Measures:
+Показатели:
 
 - `active_users`
 - `cohort_size`
 - `retention_rate`
 
-Calculated fields:
+Вычисляемые поля:
 
 - `Retention rate` = `AVG([retention_rate])`
 
-### Dataset `datalens_product_conversion`
+### Датасет `datalens_product_conversion`
 
 Источник: `data/marts/datalens_product_conversion.csv`
 
-Dimensions:
+Измерения:
 
 - `product_id`
 - `category_code`
 - `brand`
 
-Measures:
+Показатели:
 
 - `views_cnt`
 - `carts_cnt`
@@ -98,20 +98,20 @@ Measures:
 - `revenue`
 - `conversion_rate`
 
-Calculated fields:
+Вычисляемые поля:
 
 - `Конверсия товара` = `SUM([purchases_cnt]) / SUM([views_cnt])`
 
-### Dataset `datalens_sessions_summary`
+### Датасет `datalens_sessions_summary`
 
 Источник: `data/marts/datalens_sessions_summary.csv`
 
-Dimensions:
+Измерения:
 
 - `session_date`
 - `session_depth_segment`
 
-Measures:
+Показатели:
 
 - `sessions_cnt`
 - `purchase_sessions_cnt`
@@ -121,45 +121,47 @@ Measures:
 - `avg_session_duration_minutes`
 - `avg_events_cnt`
 
-Calculated fields:
+Вычисляемые поля:
 
 - `Конверсия сессии в покупку` = `SUM([purchase_sessions_cnt]) / SUM([sessions_cnt])`
 - `Доля брошенных корзин` = `SUM([abandoned_cart_sessions_cnt]) / SUM([cart_sessions_cnt])`
 - `GMV` = `SUM([revenue])`
 
-### Dataset `datalens_propensity_scores`
+### Датасет `datalens_propensity_deciles`
 
-Источник: `data/marts/datalens_propensity_scores.csv`
+Источник: `data/marts/datalens_propensity_deciles.csv`
 
-Создайте dataset только если файл существует.
+Создайте dataset только если файл существует. Для модели используется агрегат по децилям, а не полный session-level файл. Это уменьшает размер загрузки и оставляет показатели, нужные для BI-графика.
 
-Dimensions:
+Измерения:
 
 - `score_decile`
-- `session_start`
 
-Measures:
+Показатели:
 
-- `purchase_flag`
-- `baseline_score`
-- `model_score`
+- `sessions_cnt`
+- `purchases_cnt`
+- `purchase_rate`
+- `avg_score`
+- `revenue`, если колонка есть
+- `revenue_per_session`, если колонка есть
 
-Calculated fields:
+Вычисляемые поля:
 
-- `Доля покупок` = `AVG([purchase_flag])`
-- `Средний скоринг модели` = `AVG([model_score])`
-- `Сессии` = `COUNT([session_id])`
+- `Доля покупок` = `AVG([purchase_rate])`
+- `Средний скоринг модели` = `AVG([avg_score])`
+- `Сессии` = `SUM([sessions_cnt])`
 
-## 4. Charts
+## 4. Чарты
 
-### KPI cards
+### KPI-карточки
 
 Используйте datasets:
 
 - `datalens_funnel_daily` для purchase conversion rate, cart-to-purchase rate и GMV;
 - `datalens_sessions_summary` для abandoned cart share.
 
-Charts:
+Чарты:
 
 - KPI `Конверсия просмотра в покупку`
 - KPI `Конверсия корзины в покупку`
@@ -185,7 +187,7 @@ Charts:
 - Дополнительная мера: `SUM([views_cnt])`
 - Сортировка: по просмотрам или по конверсии
 
-### Table проблемных категорий с высоким drop-off
+### Таблица проблемных категорий с высоким drop-off
 
 Источник: `datalens_funnel_daily`.
 
@@ -241,16 +243,17 @@ Charts:
 
 ### Decile chart по модели вероятности покупки
 
-Источник: `datalens_propensity_scores`.
+Источник: `datalens_propensity_deciles`.
 
 - X: `score_decile`
 - Y: `Доля покупок`
 - Дополнительная мера: `Средний скоринг модели`
 
-Если файла `datalens_propensity_scores.csv` нет, сначала обучите модель командой:
+Если файла `datalens_propensity_deciles.csv` нет, сначала обучите модель и повторите экспорт:
 
 ```powershell
 python scripts/train_propensity_model.py
+python scripts/export_for_datalens.py
 ```
 
 ## 5. Filters
@@ -287,12 +290,12 @@ python scripts/train_propensity_model.py
 - date filter;
 - decile chart по модели вероятности покупки.
 
-## 7. Screenshots
+## 7. Скриншоты
 
-После ручной сборки dashboard положите screenshots в `assets/`:
+После ручной сборки dashboard положите главный скриншот в:
 
-- `dashboard_page_1_overview.png`
-- `dashboard_page_2_analytics.png`
-- `funnel_chart.png`
-- `cohort_heatmap.png`
-- `propensity_decile_chart.png`
+- `assets/dashboard_full_view.png`
+
+Если нужен дополнительный скриншот KPI и воронки, положите его в:
+
+- `assets/dashboard_kpi_funnel_view.png`

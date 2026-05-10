@@ -1,31 +1,20 @@
 # Product Funnel & Retention Command Center for E-commerce
 
-## Executive summary
+## Описание проекта
 
-Портфолио-проект по продуктовой аналитике e-commerce на событийных данных магазина косметики. Проект показывает полный аналитический контур: ETL, очистку событий, SQL-витрины в DuckDB, анализ воронки, cohort retention, сегментацию сессий и базовую модель вероятности покупки.
+Проект посвящен продуктовой аналитике e-commerce event-data. В нем реализованы ETL, SQL-витрины, sessionization, анализ воронки `view -> cart -> purchase`, cohort retention, сегментация пользователей, baseline purchase propensity model и BI-dashboard в Yandex DataLens.
 
-Рассчитанные результаты на локально подготовленных данных:
-
-- период данных: 2019-10-01 — 2020-02-29;
-- событий: 19 583 618;
-- пользователей: 1 639 358;
-- конверсия просмотра в покупку: 13,32%;
-- конверсия корзины в покупку: 22,75%;
-- GMV: 6 348 267,70;
-- доля брошенных корзин: 87,21%;
-- средний retention первого месяца после первой покупки: 11,41%.
+Цель проекта — показать полный аналитический workflow: от сырых событий до витрин, ноутбуков, модели скоринга и dashboard для бизнес-интерпретации.
 
 ## Бизнес-вопрос
 
-Как пользователи проходят путь от просмотра товара до покупки, где возникают основные потери воронки, какие категории и бренды требуют внимания и можно ли ранжировать сессии по вероятности покупки для аналитической приоритизации?
+Где пользователи теряются в воронке, какие категории и бренды имеют высокий drop-off, как меняется retention по когортам и как можно приоритизировать сессии с высокой вероятностью покупки?
 
 ## Данные
 
-Источник: Kaggle dataset `eCommerce Events History in Cosmetics Shop`.
+Используются публичные e-commerce event-data. Сырые данные не хранятся в репозитории и должны быть помещены вручную в `data/raw/`.
 
-Сырые CSV-файлы добавляются вручную в `data/raw/`. Автоматическая загрузка данных из Kaggle в проекте не используется.
-
-Ожидаемые поля:
+Ожидаемые поля входных CSV:
 
 - `event_time`
 - `event_type`
@@ -37,232 +26,139 @@
 - `user_id`
 - `user_session`
 
-## Архитектура проекта
+## Структура проекта
+
+- `data/raw/` — сырые CSV-файлы, добавляются вручную.
+- `data/processed/` — очищенный parquet после ETL.
+- `data/marts/` — DuckDB-база, аналитические витрины и CSV для BI.
+- `sql/` — SQL-скрипты для фактов и витрин.
+- `notebooks/` — аналитические ноутбуки.
+- `src/ecommerce_analytics/` — Python-пакет проекта.
+- `tests/` — pytest-тесты.
+- `reports/` — бизнес-резюме, спецификация dashboard, метрики модели.
+- `bi/datalens/` — инструкция по ручной сборке dashboard в Yandex DataLens.
+- `assets/` — screenshots dashboard для README и портфолио.
+
+## ETL
+
+ETL читает сырые CSV-файлы из `data/raw/`, объединяет события, очищает типы, приводит `event_time` к datetime, приводит `price` к float, удаляет полные дубли, фильтрует некорректные цены, проверяет обязательные колонки и сохраняет processed parquet:
 
 ```text
-.
-├── assets/
-├── bi/
-│   └── datalens/
-├── data/
-│   ├── marts/
-│   ├── processed/
-│   └── raw/
-├── notebooks/
-├── reports/
-├── scripts/
-├── sql/
-├── src/
-│   └── ecommerce_analytics/
-└── tests/
+data/processed/events_clean.parquet
 ```
 
-Основные этапы:
-
-1. `data/raw/` — сырые CSV-файлы.
-2. `data/processed/events_clean.parquet` — очищенный событийный слой.
-3. `data/marts/ecommerce.duckdb` — DuckDB-база с фактами и витринами.
-4. `data/marts/*.parquet` и `data/marts/*.csv` — экспортированные аналитические витрины.
-5. `reports/` — спецификация dashboard, бизнес-резюме и метрики модели.
-6. `notebooks/` — аналитические ноутбуки.
-7. `bi/datalens/` — инструкция для ручной сборки dashboard в Yandex DataLens.
-
-## SQL-витрины
-
-SQL-слой находится в `sql/` и строится командой:
-
-```powershell
-python scripts/build_marts.py
-```
-
-Витрины:
-
-- `fct_events` — очищенные события с датой события.
-- `fct_sessions` — сессии, события, просмотры, корзины, покупки, выручка, длительность и глубина сессии.
-- `mart_funnel_daily` — дневная воронка по категории и бренду.
-- `mart_retention` — cohort retention по месяцу первой покупки.
-- `mart_product_conversion` — конверсия и выручка по товарам.
-
-## KPI
-
-Ключевые показатели проекта:
-
-- purchase conversion rate;
-- cart-to-purchase rate;
-- repeat purchase 30d;
-- GMV;
-- abandoned cart share;
-- cohort retention;
-- session depth;
-- top-decile precision модели вероятности покупки.
-
-Если показатель еще не рассчитан отдельной витриной, в публичных выводах используется шаблон значения: `[X]%`, `[Y] п.п.`, `[Z] рублей`.
-
-## Модель
-
-Модель вероятности покупки оценивает вероятность покупки в сессии.
-
-Признаки:
-
-- длительность сессии;
-- количество событий, просмотров и добавлений в корзину;
-- количество уникальных товаров и категорий;
-- средняя цена просмотренных товаров;
-- час начала сессии, день недели и признак выходного дня;
-- количество предыдущих сессий пользователя;
-- количество предыдущих покупок пользователя.
-
-Валидация выполняется через time-based split по `session_start`.
-
-Команда обучения:
-
-```powershell
-python scripts/train_propensity_model.py
-```
-
-Результаты:
-
-- `reports/propensity_metrics.json`
-- `data/marts/propensity_scores.parquet`
-
-На текущем локальном расчете модель на деревьях показывает ROC-AUC 0,991 и PR-AUC 0,755. Эти метрики описывают качество ранжирования на тестовом периоде и не являются доказательством бизнес-эффекта.
-
-## Dashboard
-
-Спецификация dashboard находится в:
-
-```text
-reports/dashboard_spec.md
-```
-
-Инструкция для Yandex DataLens находится в:
-
-```text
-bi/datalens/datalens_setup_guide.md
-```
-
-Dashboard состоит из двух страниц:
-
-- управленческий обзор: KPI cards, воронка, breakdown по категориям и брендам, alert block по максимальному drop-off;
-- аналитический обзор: cohort heatmap, retention curve, scatter session depth vs conversion, таблица категорий с высоким трафиком и слабой конверсией, децильный график модели.
-
-Скриншоты dashboard нужно положить в `assets/`:
-
-- `dashboard_page_1_overview.png`
-- `dashboard_page_2_analytics.png`
-- `funnel_chart.png`
-- `cohort_heatmap.png`
-- `propensity_decile_chart.png`
-
-## BI / Yandex DataLens
-
-Проект не создает dashboard в Yandex DataLens автоматически. Для ручной сборки подготовлен отдельный BI-слой: CSV-экспорты и инструкция по настройке datasets, calculated fields, charts, filters и dashboard-страниц.
-
-Экспорт CSV для Yandex DataLens:
-
-```powershell
-python scripts/export_for_datalens.py
-```
-
-Файлы для загрузки в Yandex DataLens:
-
-- `data/marts/datalens_funnel_daily.csv`
-- `data/marts/datalens_retention.csv`
-- `data/marts/datalens_product_conversion.csv`
-- `data/marts/datalens_sessions_summary.csv`
-- `data/marts/datalens_propensity_scores.csv`, если модель вероятности покупки уже обучена
-
-После ручной сборки dashboard нужно положить screenshots в `assets/`:
-
-- `dashboard_page_1_overview.png`
-- `dashboard_page_2_analytics.png`
-- `funnel_chart.png`
-- `cohort_heatmap.png`
-- `propensity_decile_chart.png`
-
-## Как запустить
-
-1. Создать и активировать виртуальное окружение.
-2. Установить зависимости:
-
-```powershell
-pip install -r requirements.txt
-```
-
-3. Положить CSV-файлы Kaggle в `data/raw/`.
-4. Запустить ETL:
+Команда:
 
 ```powershell
 python scripts/run_etl.py
 ```
 
-5. Построить SQL-витрины:
+## SQL-витрины
+
+SQL-слой строится в DuckDB на основе `data/processed/events_clean.parquet`.
+
+Основные витрины:
+
+- `fct_events` — очищенный событийный факт.
+- `fct_sessions` — сессионный факт с метриками глубины, длительности, корзины, покупки и выручки.
+- `mart_funnel_daily` — дневная воронка по категориям и брендам.
+- `mart_retention` — cohort retention по месяцу первой покупки.
+- `mart_product_conversion` — конверсия и выручка по товарам.
+
+Команда:
 
 ```powershell
 python scripts/build_marts.py
 ```
 
-6. Обучить модель вероятности покупки:
+## Аналитика
+
+Аналитический слой включает:
+
+- KPI overview;
+- funnel analysis;
+- category / brand conversion;
+- cohort retention;
+- product conversion;
+- segmentation.
+
+Основной ноутбук:
+
+```text
+notebooks/01_product_analysis.ipynb
+```
+
+## Модель purchase propensity
+
+Модель ранжирует сессии по вероятности покупки. Используется time-based validation по `session_start`, без random split.
+
+Модель используется для приоритизации сессий на основе уже наблюдаемого поведения в рамках сессии.
+
+Команда:
 
 ```powershell
 python scripts/train_propensity_model.py
 ```
 
-7. Подготовить CSV для Yandex DataLens:
+Результаты сохраняются в:
+
+```text
+reports/propensity_metrics.json
+data/marts/propensity_scores.parquet
+```
+
+## BI-dashboard
+
+Dashboard собран в Yandex DataLens. Он показывает управленческий и аналитический слой проекта.
+
+Основные блоки:
+
+- GMV;
+- конверсия в покупку;
+- конверсия из корзины в покупку;
+- доля брошенных корзин;
+- конверсия по категориям;
+- категории и бренды с высоким drop-off;
+- cohort retention;
+- кривая удержания по когортам;
+- качество скоринга по децилям.
+
+![Yandex DataLens dashboard](assets/dashboard_full_view.png)
+
+CSV для ручной сборки dashboard в Yandex DataLens готовятся командой:
 
 ```powershell
 python scripts/export_for_datalens.py
 ```
 
-8. Открыть аналитические ноутбуки:
+Инструкция по ручной сборке:
 
-```powershell
-jupyter notebook notebooks/01_product_analysis.ipynb
-jupyter notebook notebooks/02_propensity_model.ipynb
+```text
+bi/datalens/datalens_setup_guide.md
 ```
 
-9. Запустить тесты:
+## Как запустить проект
 
 ```powershell
+pip install -r requirements.txt
+python scripts/run_etl.py
+python scripts/build_marts.py
+python scripts/train_propensity_model.py
+python scripts/export_for_datalens.py
 python -m pytest
 ```
 
-## Результаты
+## Ограничения анализа
 
-Финальное бизнес-резюме находится в:
+- Анализ не доказывает causal uplift.
+- Выводы основаны на публичных данных.
+- Dashboard показывает аналитические и сценарные выводы.
+- Эффект рекомендаций нужно проверять через эксперимент или дополнительные данные.
+- В проекте нет полного бизнес-контекста по скидкам, доставке, остаткам, рекламным кампаниям и изменениям интерфейса.
 
-```text
-reports/final_business_summary.md
-```
+## Дальнейшие улучшения
 
-Ключевые рассчитанные наблюдения:
-
-- обработано 19 583 618 событий;
-- общая конверсия просмотра в покупку составляет 13,32%;
-- конверсия корзины в покупку составляет 22,75%;
-- доля брошенных корзин среди сессий с корзиной составляет 87,21%;
-- средний retention первого месяца после первой покупки составляет 11,41%;
-- верхний дециль модели вероятности покупки захватывает 99,31% покупок тестового периода.
-
-Эти результаты описывают найденные закономерности в данных. Они не доказывают, что конкретное продуктовое действие изменит продажи или удержание.
-
-## Ограничения
-
-- CSV-файлы не входят в репозиторий.
-- Сырые и производные большие файлы исключены из Git.
-- Сессии с пустым `user_session` восстановлены по правилу разрыва больше 30 минут.
-- Повторная покупка за 30 дней требует отдельного расчета.
-- В данных нет скидок, рекламных касаний, остатков, доставки и изменений интерфейса.
-- Скоринг модели является scenario analysis, а не доказанным causal uplift.
-
-## Что можно улучшить
-
-- Добавить отдельную витрину repeat purchase 30d.
-- Добавить срезы по ценовым диапазонам и типам категорий.
-- Добавить анализ сезонности и промо-периодов при наличии данных.
-- Проверить калибровку модели вероятности покупки.
-- Подготовить dashboard в BI-инструменте и положить screenshots в `assets/`.
-
-## Статус проекта
-
-В разработке.
+- Добавить A/B-test design для проверки гипотез.
+- Расширить модель без leakage.
+- Добавить больше user-level features.
+- Автоматизировать обновление BI-витрин.
